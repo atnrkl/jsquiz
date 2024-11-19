@@ -1,101 +1,228 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+// Type Definitions
+interface Option {
+  text: string;
+  isCorrect: boolean;
 }
+
+interface Question {
+  id: number;
+  question: string;
+  options: Option[];
+}
+
+interface UserAnswer {
+  questionId: number;
+  question: string;
+  selectedAnswer: string;
+  isCorrect: boolean;
+}
+
+const QuizApp: React.FC = () => {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
+  const [timer, setTimer] = useState(30);
+  const [isQuizStarted, setIsQuizStarted] = useState(false);
+  const [isQuizCompleted, setIsQuizCompleted] = useState(false);
+  const [isAnsweringEnabled, setIsAnsweringEnabled] = useState(false);
+
+  const generateOptions = (post: any, index: number): Option[] => {
+    const primaryText = post.title;
+    const secondaryText = post.body;
+
+    const optionTexts = [
+      primaryText,
+      secondaryText.split(" ").slice(0, 5).join(" "),
+      post.title.split(" ").slice(1, 6).join(" "),
+      secondaryText.split(" ").slice(5, 10).join(" "),
+    ];
+
+    const shuffledOptions = optionTexts
+      .map((text, idx) => ({
+        text: text,
+        isCorrect: text === primaryText,
+      }))
+      .sort(() => Math.random() - 0.5);
+
+    return shuffledOptions;
+  };
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const response = await axios.get(
+          "https://jsonplaceholder.typicode.com/posts"
+        );
+        const parsedQuestions: Question[] = response.data
+          .slice(0, 10)
+          .map((post: any, index: number) => ({
+            id: post.id,
+            question: `Soru ${index + 1}: ${post.title}`,
+            options: generateOptions(post, index),
+          }));
+        setQuestions(parsedQuestions);
+      } catch (error) {
+        console.error("Failed to fetch questions", error);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
+
+  useEffect(() => {
+    if (!isQuizStarted || isQuizCompleted) return;
+
+    const interval = setInterval(() => {
+      setTimer((prevTimer) => {
+        if (prevTimer <= 0) {
+          handleNextQuestion();
+          return 30;
+        }
+
+        if (prevTimer === 20) {
+          setIsAnsweringEnabled(true);
+        }
+
+        return prevTimer - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isQuizStarted, isQuizCompleted]);
+
+  const handleStartQuiz = () => {
+    setIsQuizStarted(true);
+    setTimer(30);
+    setIsAnsweringEnabled(false);
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setTimer(30);
+      setIsAnsweringEnabled(false);
+    } else {
+      setIsQuizCompleted(true);
+    }
+  };
+
+  const handleAnswer = (selectedOption: Option) => {
+    if (!isAnsweringEnabled) return;
+
+    const currentQuestion = questions[currentQuestionIndex];
+    const answerResult: UserAnswer = {
+      questionId: currentQuestion.id,
+      question: currentQuestion.question,
+      selectedAnswer: selectedOption.text,
+      isCorrect: selectedOption.isCorrect,
+    };
+
+    setUserAnswers((prev) => [...prev, answerResult]);
+    handleNextQuestion();
+  };
+
+  if (!isQuizStarted) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Quiz Başlangıç</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>10 soruluk teste başlamak için "Başla" butonuna tıklayın.</p>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleStartQuiz} className="w-full">
+            Başla
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  if (isQuizCompleted) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle>Test Sonuçları</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="border p-2">Soru</th>
+                <th className="border p-2">Verilen Yanıt</th>
+                <th className="border p-2">Doğruluk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {userAnswers.map((answer, index) => (
+                <tr key={index}>
+                  <td className="border p-2">{answer.question}</td>
+                  <td className="border p-2">{answer.selectedAnswer}</td>
+                  <td className="border p-2">
+                    {answer.isCorrect ? "✅ Doğru" : "❌ Yanlış"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Quiz Sorusu {currentQuestionIndex + 1}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Progress
+          value={(timer / 30) * 100}
+          className="mb-4"
+          color={timer <= 10 ? "red" : "blue"}
+        />
+        <h2 className="text-lg font-semibold mb-4">
+          {currentQuestion.question}
+        </h2>
+        <div className="space-y-2">
+          {currentQuestion.options.map((option, index) => (
+            <Button
+              key={index}
+              onClick={() => handleAnswer(option)}
+              disabled={!isAnsweringEnabled}
+              variant="outline"
+              className="w-full h-auto whitespace-normal break-words flex justify-start items-center"
+            >
+              <span className="mr-2 font-bold">
+                {["A", "B", "C", "D"][index]}-)
+              </span>
+              <span className="text-left">{option.text}</span>
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter>
+        <p className="text-sm text-gray-500">Kalan Süre: {timer} saniye</p>
+      </CardFooter>
+    </Card>
+  );
+};
+
+export default QuizApp;
