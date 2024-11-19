@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-// Type Definitions
 interface Option {
   text: string;
   isCorrect: boolean;
